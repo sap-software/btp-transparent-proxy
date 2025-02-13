@@ -1,0 +1,27 @@
+apiVersion: operator.kyma-project.io/v1alpha1
+kind: TransparentProxy
+metadata:
+  name: transparent-proxy
+  namespace: sap-transp-proxy-system
+spec:
+  config:
+    managedNamespacesMode: "labelSelector"
+    manager:
+      executionIntervalMinutes: 1
+    security:
+      communication:
+        internal:
+          encryptionEnabled: true
+    integration:
+      destinationService:
+        defaultInstanceName: ${SERVICE_INSTANCE_NAME}
+        instances:
+          - name: ${SERVICE_INSTANCE_NAME}
+            serviceCredentials:
+              secretKey: ${SECRET_KEY}
+              secretName: ${SECRET_NAME}
+              secretNamespace: ${SECRET_NAMESPACE}
+      serviceMesh:
+        istio:
+          istio-injection: enabled
+
