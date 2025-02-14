@@ -11,7 +11,7 @@ This repository provides shell scripts to assist with the lifecycle management o
 
 ## Usage
 ### Deploy
-Deploy transparent proxy with operator. The installation will result in transparent proxy operator and transparent proxy installed with predefined configurations in your Kubernetes cluster. The transparent proxy configuration is located in the Transparent Proxy custom resource and can be found in the sap-transp-proxy-namespace after installation. The default configuration is the following:
+Deploy transparent proxy with operator. The installation will result in transparent proxy operator and transparent proxy installed with predefined configurations in your Kubernetes cluster. The transparent proxy configuration is located in the Transparent Proxy custom resource and can be found in the 'sap-transp-proxy-system' namespace after installation. The default configuration is the following:
 ```yaml
 apiVersion: operator.kyma-project.io/v1alpha1
 kind: TransparentProxy
@@ -40,7 +40,7 @@ spec:
 **Caution:** *Istio injection is enabled by default. If Istio is present in the cluster, traffic between the workloads will be encrypted, making your installation more secure. The communication with the transparent proxy will be secure, as well as the communication from the transparent proxy to the connectivity proxy, if a connectivity proxy is present. If Istio is not present, you should configure encryption manually to ensure that all communications remain secure.*
 
 #### Deploy/Upgrade using the [SAP BTP Service Operator](https://github.com/SAP/sap-btp-service-operator)
-This operation creates Service instance and Service Binding custom resources in the sap-transp-proxy namespace, resulting in a destination service instance created in BTP. This destination service instance is loaded in the transparent proxy configuration with name "sap-transp-proxy-default".  
+This operation creates Service instance and Service Binding custom resources in the 'sap-transp-proxy-system' namespace, resulting in a destination service instance created in BTP. This destination service instance is loaded in the transparent proxy configuration with name "sap-transp-proxy-default".  
 **Note:** *To upgrade, execute the same command in a Kubernetes cluster where you have already used this script to install the Transparent Proxy.*  
 **Note:** *The upgrade operation will only upgrade to the newer version of the transparent proxy deployments without creating additional destination service instance or changing configurations.*
 ###### Prerequisites

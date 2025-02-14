@@ -1,5 +1,40 @@
 #!/bin/bash
 
+show_usage() {
+  echo "Usage: deploy.sh [OPTIONS]"
+
+  echo "Options:"
+  echo "### Using a destination service instance key as plain JSON"
+  echo "  -dsk,  --destination-service-key <value>          Use a destination service instance key."
+  echo "  -dsin, --destination-service-instance-name <value>  Specify the destination service instance name."
+  echo ""
+  echo "### Using a Kubernetes Secret holding a destination service instance key"
+  echo "  -dssn, --destination-service-secret-name <value>  Use a Kubernetes secret holding a destination service instance key."
+  echo "  -dssns, --destination-service-secret-namespace <value>  Specify the secret namespace."
+  echo "  -dssk, --destination-service-secret-key <value>  Specify the secret key holding the destination service instance key."
+  echo "  -dsin, --destination-service-instance-name <value>  (Optional) Specify the service instance name. If not provided, the secret name will be used."
+  echo ""
+  echo "### Leveraging SAP BTP Service Operator for automatic destination service instance creation"
+  echo "  (no options)                                     If BTP operator is present in the Kubernetes cluster, a default destination service instance is created and linked to the transparent proxy."
+  echo ""
+  echo "Examples:"
+  echo "  deploy.sh --destination-service-key my-key-json --destination-service-instance-name my-instance"
+  echo "  deploy.sh --destination-service-secret-name my-secret --destination-service-secret-namespace my-namespace --destination-service-secret-key my-key"
+  echo "  deploy.sh  # If BTP operator is present in the Kubernetes cluster, a default destination service instance is created and linked to the transparent proxy."
+}
+
+print_success() {
+  echo "\033[32mOperation successful. To take a look at the transparent proxy configuration, execute:
+kubectl get tp transparent-proxy -n sap-transp-proxy-system -o yaml\033[0m" >&2
+  exit 0
+}
+
+print_error() {
+  local message="$1"
+  echo "\033[31m$message\033[0m" >&2
+  exit 1
+}
+
 get_instance_index() {
   local instance_name="$1"
 
@@ -7,7 +42,7 @@ get_instance_index() {
     return 1
   fi
 
-  resource_yaml=$(kubectl get tp transparent-proxy -n sap-transp-proxy-system -o yaml)
+  resource_yaml="$(kubectl get tp transparent-proxy -n sap-transp-proxy-system -o yaml)"
 
   in_instances=0
   in_associate_with=0
@@ -56,26 +91,30 @@ replace_destination_service_instance() {
     return 1
   fi
 
-  kubectl patch tp transparent-proxy -n sap-transp-proxy-system --type='json' -p="
-  [
-    {
-      \"op\": \"replace\",
-      \"path\": \"/spec/config/integration/destinationService/instances/$instance_index\",
-      \"value\": {
-        \"name\": \"${instance_name}\",
-        \"serviceCredentials\": {
-          \"secretKey\": \"${secret_key}\",
-          \"secretName\": \"${secret_name}\",
-          \"secretNamespace\": \"${secret_namespace}\"
-        }
+  kubectl patch tp transparent-proxy -n sap-transp-proxy-system --type='json' -p="$(cat <<EOF
+[
+  {
+    "op": "replace",
+    "path": "/spec/config/integration/destinationService/instances/$instance_index",
+    "value": {
+      "name": "${instance_name}",
+      "serviceCredentials": {
+        "secretKey": "${secret_key}",
+        "secretName": "${secret_name}",
+        "secretNamespace": "${secret_namespace}"
       }
     }
-  ]"
+  }
+]
+EOF
+)"
 
   if [[ $? -eq 0 ]]; then
-    echo "Destination service instance: $instance_name is successfully replaced"
+    echo "Destination service instance [$instance_name] has been successfully replaced."
+    print_success
+    return 0
   else
-    echo "Failed to replace destination service instance."
+    print_error "Failed to replace destination service instance [$instance_name]."
     return 1
   fi
 }
@@ -88,22 +127,24 @@ add_destination_service_instance() {
   local secret_namespace="$4"
 
 
-  kubectl patch tp transparent-proxy -n sap-transp-proxy-system --type='json' -p="
-  [
-    {
-      \"op\": \"add\",
-      \"path\": \"/spec/config/integration/destinationService/instances/-\",
-      \"value\": {
-        \"name\": \"${instance_name}\",
-        \"serviceCredentials\": {
-          \"secretKey\": \"${secret_key}\",
-          \"secretName\": \"${secret_name}\",
-          \"secretNamespace\": \"${secret_namespace}\"
-        }
+
+  kubectl patch tp transparent-proxy -n sap-transp-proxy-system --type='json' -p="$(cat <<EOF
+[
+  {
+    "op": "add",
+    "path": "/spec/config/integration/destinationService/instances/-",
+    "value": {
+      "name": "${instance_name}",
+      "serviceCredentials": {
+        "secretKey": "${secret_key}",
+        "secretName": "${secret_name}",
+        "secretNamespace": "${secret_namespace}"
       }
     }
-  ]"
-
+  }
+]
+EOF
+)"
 }
 
 update_k8s_secret() {
@@ -134,50 +175,75 @@ PARAMS_PASSED=$#
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --help|-h)
+      show_usage
+      exit 0
+      ;;
     --destination-service-key|-dsk)
-      DS_KEY_JSON="$2"
-      shift 2
+      if [[ -n "$2" && "$2" != -* ]]; then
+        DS_KEY_JSON="$2"
+        shift 2
+      else
+        print_error "Missing value for $1"
+        exit 1
+      fi
       ;;
     --destination-service-secret-name|-dssn)
-      DS_SECRET_NAME="$2"
-      shift 2
+      if [[ -n "$2" && "$2" != -* ]]; then
+        DS_SECRET_NAME="$2"
+        shift 2
+      else
+        print_error "Missing value for $1"
+        exit 1
+      fi
       ;;
     --destination-service-secret-namespace|-dssns)
-      DS_SECRET_NAMESPACE="$2"
-      shift 2
+      if [[ -n "$2" && "$2" != -* ]]; then
+        DS_SECRET_NAMESPACE="$2"
+        shift 2
+      else
+        print_error "Missing value for $1"
+        exit 1
+      fi
       ;;
     --destination-service-secret-key|-dssk)
-      DS_SECRET_KEY="$2"
-      shift 2
+      if [[ -n "$2" && "$2" != -* ]]; then
+        DS_SECRET_KEY="$2"
+        shift 2
+      else
+        print_error "Missing value for $1"
+        exit 1
+      fi
       ;;
     --destination-service-instance-name|-dsin)
-      DS_INSTANCE_NAME="$2"
-      shift 2
+      if [[ -n "$2" && "$2" != -* ]]; then
+        DS_INSTANCE_NAME="$2"
+        shift 2
+      else
+        print_error "Missing value for $1"
+        exit 1
+      fi
       ;;
     *)
-      echo "Unknown option: $1" >&2
-      echo "Usage: $0 [--destination-service-key|-dsk <value> --destination-service-instance-name|-dsin <value>] |\n[--destination-service-secret-name|-dssn <value> \n --destination-service-secret-namespace|-dssns <value> \n --destination-service-secret-key|-dssk <value> \n [--destination-service-instance-name|-dsin <value>]]"
+      print_error "Unknown option: $1"
+      show_usage
       exit 1
       ;;
   esac
 done
 
 BTP_OPERATOR_PRESENT=false
-
 if [[ $PARAMS_PASSED -eq 0 ]]; then
   echo "No arguments provided. Checking whether BTP Operator is present in the cluster..."
   CRD_NAME="serviceinstances.services.cloud.sap.com"
   kubectl get crd $CRD_NAME &> /dev/null
 
   if [ $? -eq 0 ]; then
-      echo "BTP Operator is present."
+      echo "BTP Operator is present. A default destination service instance with name 'sap-transp-proxy-default' will be created."
       BTP_OPERATOR_PRESENT=true
   else
-    echo "No BTP Operator is present. A default destination service instance with name 'sap-transp-proxy-default' will be created."
-    echo "You must provide either:"
-    echo "  1. --destination-service-key|-dsk <value> \n     and --destination-service-instance-name|-dsin <value> - destination service(DS) key as JSON and destination service(DS) instance name OR"
-    echo "  2. --destination-service-secret-name|-dssn <value>, \n     --destination-service-secret-namespace|-dssns <value> \n     and --destination-service-secret-key|-dssk <value>. - Refer destination service(DS) secret from another namespace"
-    echo "Usage: $0 [--destination-service-key|-dsk <value> --destination-service-instance-name|-dsin <value>] |\n[--destination-service-secret-name|-dssn <value> \n --destination-service-secret-namespace|-dssns <value> \n --destination-service-secret-key|-dssk <value> \n [--destination-service-instance-name|-dsin <value>]]"
+    print_error "No BTP Operator is present. Invalid operation."
+    show_usage  
     exit 1
   fi
 fi
@@ -186,14 +252,10 @@ if [[ (-n "$DS_KEY_JSON" && -n "$DS_SECRET_NAME" && -n "$DS_SECRET_NAMESPACE" &&
 	|| (-n "$DS_KEY_JSON" && ( -n "$DS_SECRET_NAME" || -n "$DS_SECRET_NAMESPACE" || -n "$DS_SECRET_KEY" )) 
   || (-n "$DS_KEY_JSON" && -z "$DS_INSTANCE_NAME")
   || ( -n "$DS_SECRET_NAME" || -n "$DS_SECRET_NAMESPACE" || -n "$DS_SECRET_KEY" ) && ( -z "$DS_SECRET_NAME" || -z "$DS_SECRET_NAMESPACE" || -z "$DS_SECRET_KEY" ) ]]; then
-  echo "You must provide either:"
-  echo "  1. --destination-service-key|-dsk <value> \n     and --destination-service-instance-name|-dsin <value> - destination service(DS) key as JSON and destination service(DS) instance name OR"
-  echo "  2. --destination-service-secret-name|-dssn <value>, \n     --destination-service-secret-namespace|-dssns <value> \n     and --destination-service-secret-key|-dssk <value>. - Refer destination service(DS) secret from another namespace"
-  echo "Usage: $0 [--destination-service-key|-dsk <value> --destination-service-instance-name|-dsin <value>] |\n[--destination-service-secret-name|-dssn <value> \n --destination-service-secret-namespace|-dssns <value> \n --destination-service-secret-key|-dssk <value> \n [--destination-service-instance-name|-dsin <value>]]"
+  print_error "Invalid operation."
+  show_usage 
   exit 1
 fi
-
-kubectl apply -f $OPERATOR_FILE
 
 if [[ -n "$DS_SECRET_NAME" && -n "$DS_SECRET_NAMESPACE" && -n "$DS_SECRET_KEY" ]]; then
   if [[ -z "$DS_INSTANCE_NAME" ]]; then
@@ -202,18 +264,17 @@ if [[ -n "$DS_SECRET_NAME" && -n "$DS_SECRET_NAMESPACE" && -n "$DS_SECRET_KEY" ]
 
   SECRET_DATA=$(kubectl get secret $DS_SECRET_NAME -n $DS_SECRET_NAMESPACE -o go-template='{{range $k, $v := .data}}{{$k}}{{"\n"}}{{end}}' 2>/dev/null )
   if [ $? -ne 0 ]; then    
-    echo "Failed to find an existing secret for destination service instance [$DS_INSTANCE_NAME]."
-    exit 1
+    print_error "Failed to find an existing secret with name [$DS_SECRET_NAME] in namespace [$DS_SECRET_NAMESPACE] for destination service instance [$DS_INSTANCE_NAME]."
   elif ! echo "$SECRET_DATA" | grep -q "^$DS_SECRET_KEY$"; then
-    echo "Failed to find key [$DS_SECRET_KEY] in the existing secret for destination service instance [$DS_INSTANCE_NAME]."
-    exit 1
+    print_error "Failed to find key [$DS_SECRET_KEY] in the existing secret for destination service instance [$DS_INSTANCE_NAME]."
   fi
-  
 
-  SERVICE_INSTANCE_NAME=$DS_INSTANCE_NAME SECRET_NAME=$DS_SECRET_NAME SECRET_NAMESPACE=$DS_SECRET_NAMESPACE SECRET_KEY=$DS_SECRET_KEY envsubst < $TP_CR_FILE | kubectl create -f - >/dev/null 2>&1
+  kubectl apply -f $OPERATOR_FILE
+  
+  curl -s $TP_CR_FILE | SERVICE_INSTANCE_NAME=$DS_INSTANCE_NAME SECRET_NAME=$DS_SECRET_NAME SECRET_NAMESPACE=$DS_SECRET_NAMESPACE SECRET_KEY=$DS_SECRET_KEY envsubst | kubectl create -f - >/dev/null 2>&1
   if [ $? -eq 0 ]; then
     echo "The Transparent Proxy custom resource has been created."
-    exit 0
+    print_success
   fi
   DS_INSTANCE_INDEX=$(get_instance_index $DS_INSTANCE_NAME)
   if (( $DS_INSTANCE_INDEX >= 0 )); then
@@ -228,14 +289,17 @@ if [[ -n "$DS_SECRET_NAME" && -n "$DS_SECRET_NAMESPACE" && -n "$DS_SECRET_KEY" ]
     add_destination_service_instance $DS_INSTANCE_NAME $DS_SECRET_KEY $DS_SECRET_NAME $DS_SECRET_NAMESPACE
     if [ $? -eq 0 ]; then
       echo "Destination service instance configuration [$DS_INSTANCE_NAME] has been added successfully to the Transparent Proxy custom resource."
+      print_success
     else
-      echo "The destination service instance configuration [$DS_INSTANCE_NAME] could not be added to the Transparent Proxy custom resource."
+      print_error "The destination service instance configuration [$DS_INSTANCE_NAME] could not be added to the Transparent Proxy custom resource."
     fi
   fi
   exit 0
 fi
 
 if [[ -n "$DS_KEY_JSON" ]]; then
+  kubectl apply -f $OPERATOR_FILE
+
   DS_SECRET_NAME=$DS_INSTANCE_NAME
   DS_SECRET_NAMESPACE="sap-transp-proxy-system"
   DS_SECRET_KEY="defaultKey"
@@ -245,15 +309,14 @@ if [[ -n "$DS_KEY_JSON" ]]; then
     if [ $? -eq 0 ]; then
       echo "Kubernetes secret for destination service instance [$DS_INSTANCE_NAME] has been created."
     else
-      echo "Failed to create Kubernetes secret for destination service instance [$DS_INSTANCE_NAME]."
-      exit 1
+      print_error "Failed to create Kubernetes secret for destination service instance [$DS_INSTANCE_NAME]."
     fi
   fi
 
-  SERVICE_INSTANCE_NAME=$DS_INSTANCE_NAME SECRET_NAME=$DS_SECRET_NAME SECRET_NAMESPACE=$DS_SECRET_NAMESPACE SECRET_KEY=$DS_SECRET_KEY envsubst < $TP_CR_FILE | kubectl create -f - >/dev/null 2>&1
+  curl -s $TP_CR_FILE | SERVICE_INSTANCE_NAME=$DS_INSTANCE_NAME SECRET_NAME=$DS_SECRET_NAME SECRET_NAMESPACE=$DS_SECRET_NAMESPACE SECRET_KEY=$DS_SECRET_KEY envsubst | kubectl create -f - >/dev/null 2>&1
   if [ $? -eq 0 ]; then
     echo "The Transparent Proxy custom resource has been created."
-    exit 0
+    print_success
   fi
   DS_INSTANCE_INDEX=$(get_instance_index $DS_INSTANCE_NAME)
   if (( $DS_INSTANCE_INDEX >= 0 )); then
@@ -266,27 +329,31 @@ if [[ -n "$DS_KEY_JSON" ]]; then
       update_k8s_secret "$DS_SECRET_NAME" "$DS_SECRET_NAMESPACE" "$DS_KEY_JSON"
       if [ $? -eq 0 ]; then
         echo "Kubernetes secret for destination service instance [$DS_INSTANCE_NAME] has been updated successfully."
+        print_success
       else
-        echo "Kubernetes secret for destination service instance [$DS_INSTANCE_NAME] could not be updated."
+        print_error "Kubernetes secret for destination service instance [$DS_INSTANCE_NAME] could not be updated."
       fi
   else
       add_destination_service_instance $DS_INSTANCE_NAME $DS_SECRET_KEY $DS_SECRET_NAME $DS_SECRET_NAMESPACE
       if [ $? -eq 0 ]; then
         echo "Destination service instance [$DS_INSTANCE_NAME] has been added successfully to the Transparent Proxy custom resource."
+        print_success
       else
-        echo "Destination service instance [$DS_INSTANCE_NAME] could not be added to the Transparent Proxy custom resource."
+        print_error "Destination service instance [$DS_INSTANCE_NAME] could not be added to the Transparent Proxy custom resource."
       fi
   fi
-  exit 0
 fi
 
 if [[ $BTP_OPERATOR_PRESENT == true ]]; then
+  kubectl apply -f $OPERATOR_FILE
+
   DS_SECRET_NAME="sap-transp-proxy-default"
   DS_SECRET_NAMESPACE="sap-transp-proxy-system"
   DS_INSTANCE_NAME=$DS_SECRET_NAME
-  SERVICE_INSTANCE_NAME=$DS_INSTANCE_NAME SECRET_NAME=$DS_SECRET_NAME SECRET_NAMESPACE=$DS_SECRET_NAMESPACE SECRET_KEY="" envsubst < $TP_CR_FILE | kubectl create -f - >/dev/null 2>&1
+  curl -s $TP_CR_FILE | SERVICE_INSTANCE_NAME=$DS_INSTANCE_NAME SECRET_NAME=$DS_SECRET_NAME SECRET_NAMESPACE=$DS_SECRET_NAMESPACE SECRET_KEY="" envsubst | kubectl create -f - >/dev/null 2>&1
   if [ $? -eq 0 ]; then
     echo "The Transparent Proxy custom resource has been created."
+    print_success
+    exit 0
   fi
 fi
-
