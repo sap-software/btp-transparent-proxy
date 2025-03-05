@@ -21,4 +21,20 @@ spec:
       serviceMesh:
         istio:
           istio-injection: enabled
+  deployment:
+    resources:
+      http:
+        requests:
+          cpu: 0.05
+          memory: 192M
+        limits:
+          cpu: 0.05
+          memory: 192M
+      tcp:
+        requests:
+          cpu: 0.01
+          memory: 64M
+        limits:
+          cpu: 0.01
+          memory: 64M
 
