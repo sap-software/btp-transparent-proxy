@@ -980,7 +980,7 @@ spec:
         - --leader-elect
         command:
         - /manager
-        image: sapse/sap-transp-proxy-operator:1.7.0
+        image: sapse/sap-transp-proxy-operator:1.7.1
         imagePullPolicy: Always
         livenessProbe:
           httpGet:
