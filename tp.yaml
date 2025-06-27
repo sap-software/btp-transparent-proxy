@@ -5,6 +5,11 @@ metadata:
   namespace: sap-transp-proxy-system
 spec:
   config:
+    metrics:
+      prometheus:
+        enabled: true
+    logging:
+      level: info
     security:
       communication:
         internal:
