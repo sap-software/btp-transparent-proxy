@@ -200,6 +200,18 @@ spec:
                 type: object
               config:
                 properties:
+                  http:
+                    properties:
+                      retry:
+                        properties:
+                          maxRetries:
+                            type: integer
+                          statusCodes:
+                            items:
+                              type: integer
+                            type: array
+                        type: object
+                    type: object
                   integration:
                     properties:
                       connectivityProxy:
@@ -1065,7 +1077,7 @@ spec:
         - --leader-elect
         command:
         - /manager
-        image: sapse/sap-transp-proxy-operator:1.8.5
+        image: sapse/sap-transp-proxy-operator:1.8.6
         imagePullPolicy: Always
         livenessProbe:
           httpGet:
@@ -1105,7 +1117,7 @@ spec:
           && cat /etc/conf/change-log-level > /etc/logging/change-log-level && adduser
           --disabled-password tpproxy && chown tpproxy /etc/logging/logger-config.yaml
           && chown tpproxy /etc/logging/change-log-level && chmod +x /etc/logging/change-log-level
-        image: alpine:3.15.4
+        image: docker.io/alpine:3.15.4
         imagePullPolicy: IfNotPresent
         name: config-init
         securityContext:
