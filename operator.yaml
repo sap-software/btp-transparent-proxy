@@ -87,7 +87,15 @@ spec:
                 type: object
               destinationRef:
                 properties:
+                  level:
+                    enum:
+                    - subaccount
+                    - instance
+                    - provider_subaccount
+                    - provider_instance
+                    type: string
                   name:
+                    minLength: 1
                     type: string
                 required:
                 - name
@@ -96,12 +104,23 @@ spec:
                 type: string
               fragmentRef:
                 properties:
+                  level:
+                    enum:
+                    - subaccount
+                    - instance
+                    - provider_subaccount
+                    - provider_instance
+                    type: string
                   name:
                     type: string
                   optional:
                     default: false
                     type: boolean
                 type: object
+                x-kubernetes-validations:
+                - message: fragmentRef.level can only be specified when fragmentRef.name
+                    is provided
+                  rule: '!(has(self.level) && !has(self.name))'
               service:
                 properties:
                   port:
@@ -138,6 +157,8 @@ spec:
                   type: object
                 type: array
             type: object
+        required:
+        - spec
         type: object
     served: true
     storage: true
@@ -1077,7 +1098,7 @@ spec:
         - --leader-elect
         command:
         - /manager
-        image: sapse/sap-transp-proxy-operator:1.8.7
+        image: sapse/sap-transp-proxy-operator:1.9.0
         imagePullPolicy: Always
         livenessProbe:
           httpGet:
