@@ -4,6 +4,8 @@ metadata:
   name: transparent-proxy
   namespace: sap-transp-proxy-system
 spec:
+  compliance:
+    fipsModeEnabled: false
   config:
     metrics:
       prometheus:
