@@ -532,6 +532,23 @@ spec:
                                 type: string
                             type: object
                         type: object
+                      manager:
+                        properties:
+                          limits:
+                            properties:
+                              cpu:
+                                type: number
+                              memory:
+                                type: string
+                            type: object
+                          requests:
+                            properties:
+                              cpu:
+                                type: number
+                              memory:
+                                type: string
+                            type: object
+                        type: object
                       tcp:
                         properties:
                           limits:
@@ -1106,7 +1123,7 @@ spec:
         env:
         - name: GODEBUG
           value: fips140=on
-        image: sapse/sap-transp-proxy-operator:1.9.1
+        image: sapse/sap-transp-proxy-operator:1.9.2
         imagePullPolicy: Always
         livenessProbe:
           httpGet:
