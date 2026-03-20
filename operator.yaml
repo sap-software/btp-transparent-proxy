@@ -1096,7 +1096,7 @@ spec:
         - --upstream=http://127.0.0.1:8080/
         - --logtostderr=true
         - --v=0
-        image: gcr.io/kubebuilder/kube-rbac-proxy:v0.13.1
+        image: docker.io/kubebuilder/kube-rbac-proxy:v0.13.1
         name: kube-rbac-proxy
         ports:
         - containerPort: 8443
@@ -1123,7 +1123,7 @@ spec:
         env:
         - name: GODEBUG
           value: fips140=on
-        image: sapse/sap-transp-proxy-operator:1.9.2
+        image: sapse/sap-transp-proxy-operator:1.9.3
         imagePullPolicy: Always
         livenessProbe:
           httpGet:
@@ -1184,3 +1184,4 @@ spec:
       - configMap:
           name: sap-transp-proxy-sap-transp-proxy-operator-logging-config
         name: sap-transp-proxy-operator-logging-config
+---
