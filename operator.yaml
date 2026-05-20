@@ -1123,7 +1123,7 @@ spec:
         env:
         - name: GODEBUG
           value: fips140=on
-        image: sapse/sap-transp-proxy-operator:1.9.4
+        image: sapse/sap-transp-proxy-operator:1.9.5
         imagePullPolicy: Always
         livenessProbe:
           httpGet:
