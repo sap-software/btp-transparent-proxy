@@ -71,6 +71,77 @@ spec:
                     - namespaced
                     type: string
                 type: object
+              actions:
+                items:
+                  properties:
+                    name:
+                      enum:
+                      - OAuth2JWTBearer
+                      - OAuth2ClientCredentials
+                      type: string
+                    secretRef:
+                      properties:
+                        key:
+                          type: string
+                        name:
+                          type: string
+                        namespace:
+                          type: string
+                      required:
+                      - name
+                      - key
+                      type: object
+                    triggers:
+                      items:
+                        oneOf:
+                        - properties:
+                            name:
+                              enum:
+                              - exist
+                          required:
+                          - destinationProperties
+                        - properties:
+                            name:
+                              enum:
+                              - exactMatch
+                          required:
+                          - matches
+                        properties:
+                          destinationProperties:
+                            items:
+                              minLength: 1
+                              type: string
+                            minItems: 1
+                            type: array
+                          matches:
+                            items:
+                              properties:
+                                destinationProperty:
+                                  minLength: 1
+                                  type: string
+                                value:
+                                  type: string
+                              required:
+                              - destinationProperty
+                              - value
+                              type: object
+                            minItems: 1
+                            type: array
+                          name:
+                            enum:
+                            - exist
+                            - exactMatch
+                            type: string
+                        required:
+                        - name
+                        type: object
+                      minItems: 1
+                      type: array
+                  required:
+                  - name
+                  - secretRef
+                  type: object
+                type: array
               chainRef:
                 properties:
                   name:
@@ -1123,7 +1194,7 @@ spec:
         env:
         - name: GODEBUG
           value: fips140=on
-        image: sapse/sap-transp-proxy-operator:1.9.5
+        image: sapse/sap-transp-proxy-operator:1.9.7
         imagePullPolicy: Always
         livenessProbe:
           httpGet:
