@@ -50,12 +50,12 @@ spec:
       jsonPath: .spec.accessControl.scope
       name: AccessControlScope
       type: string
-    - jsonPath: .status.conditions[-1].reason
-      name: Status
-      type: string
     - description: The name of the referenced chain from destination service
       jsonPath: .spec.chainRef.name
       name: ChainRef
+      type: string
+    - jsonPath: .status.conditions[-1].reason
+      name: Status
       type: string
     name: v1
     schema:
@@ -71,6 +71,111 @@ spec:
                     - namespaced
                     type: string
                 type: object
+              actions:
+                items:
+                  properties:
+                    name:
+                      enum:
+                      - OAuth2JWTBearer
+                      - OAuth2ClientCredentials
+                      type: string
+                    secretRef:
+                      properties:
+                        key:
+                          type: string
+                        name:
+                          type: string
+                        namespace:
+                          type: string
+                      required:
+                      - name
+                      - key
+                      type: object
+                    triggers:
+                      items:
+                        oneOf:
+                        - anyOf:
+                          - required:
+                            - destinationProperties
+                          - required:
+                            - destinationLabelKeys
+                          properties:
+                            name:
+                              enum:
+                              - exist
+                        - properties:
+                            name:
+                              enum:
+                              - exactMatch
+                          required:
+                          - matches
+                        properties:
+                          destinationLabelKeys:
+                            items:
+                              minLength: 1
+                              type: string
+                            minItems: 1
+                            type: array
+                          destinationProperties:
+                            items:
+                              minLength: 1
+                              type: string
+                            minItems: 1
+                            type: array
+                          matches:
+                            items:
+                              oneOf:
+                              - not:
+                                  anyOf:
+                                  - required:
+                                    - destinationLabelKey
+                                  - required:
+                                    - values
+                                required:
+                                - destinationProperty
+                                - value
+                              - not:
+                                  anyOf:
+                                  - required:
+                                    - destinationProperty
+                                  - required:
+                                    - value
+                                required:
+                                - destinationLabelKey
+                                - values
+                              properties:
+                                destinationLabelKey:
+                                  minLength: 1
+                                  type: string
+                                destinationProperty:
+                                  minLength: 1
+                                  type: string
+                                value:
+                                  type: string
+                                values:
+                                  items:
+                                    minLength: 1
+                                    type: string
+                                  minItems: 1
+                                  type: array
+                              type: object
+                            minItems: 1
+                            type: array
+                          name:
+                            enum:
+                            - exist
+                            - exactMatch
+                            type: string
+                        required:
+                        - name
+                        type: object
+                      minItems: 1
+                      type: array
+                  required:
+                  - name
+                  - secretRef
+                  type: object
+                type: array
               chainRef:
                 properties:
                   name:
@@ -266,8 +371,12 @@ spec:
                             type: object
                           serviceName:
                             type: string
+                          servicePort:
+                            type: integer
                           tcpPort:
                             type: integer
+                          type:
+                            type: string
                         type: object
                       destinationService:
                         properties:
@@ -976,18 +1085,6 @@ subjects:
 ---
 apiVersion: v1
 data:
-  change-log-level: |
-    #!/bin/sh
-
-    accepted_values="trace debug info warn error fatal"
-    input=$(echo "$1" | tr '[:upper:]' '[:lower:]')
-    if echo "$accepted_values" | grep -wq "$input"; then
-      echo "log:" > /etc/logging/logger-config.yaml
-      echo "  level: $input" >> /etc/logging/logger-config.yaml
-      echo "Successfully changed log levels to $input"
-    else
-      echo "$1 is not an accepted log level. Accepted log levels are $accepted_values"
-    fi
   logger-config.yaml: |
     log:
       level: info
@@ -1123,7 +1220,7 @@ spec:
         env:
         - name: GODEBUG
           value: fips140=on
-        image: sapse/sap-transp-proxy-operator:1.9.5
+        image: sapse/sap-transp-proxy-operator:1.9.8
         imagePullPolicy: Always
         livenessProbe:
           httpGet:
@@ -1131,7 +1228,7 @@ spec:
             port: 8081
           initialDelaySeconds: 15
           periodSeconds: 20
-        name: manager
+        name: sap-transp-proxy-operator
         readinessProbe:
           httpGet:
             path: /readyz
@@ -1159,10 +1256,8 @@ spec:
         - sh
         - -c
         - touch /etc/logging/logger-config.yaml && cat /etc/conf/logger-config.yaml
-          > /etc/logging/logger-config.yaml && touch /etc/logging/change-log-level
-          && cat /etc/conf/change-log-level > /etc/logging/change-log-level && adduser
-          --disabled-password tpproxy && chown tpproxy /etc/logging/logger-config.yaml
-          && chown tpproxy /etc/logging/change-log-level && chmod +x /etc/logging/change-log-level
+          > /etc/logging/logger-config.yaml && adduser --disabled-password tpproxy
+          && chown tpproxy /etc/logging/logger-config.yaml
         image: docker.io/library/alpine:3.22.2
         imagePullPolicy: IfNotPresent
         name: config-init
