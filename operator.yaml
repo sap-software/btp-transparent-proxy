@@ -454,6 +454,11 @@ spec:
                     properties:
                       level:
                         type: string
+                      requestContext:
+                        properties:
+                          enabled:
+                            type: boolean
+                        type: object
                     type: object
                   managedNamespacesMode:
                     type: string
@@ -608,6 +613,8 @@ spec:
                     type: object
                   image:
                     properties:
+                      initContainer:
+                        type: string
                       pullPolicy:
                         type: string
                       pullSecret:
@@ -1229,7 +1236,7 @@ spec:
         env:
         - name: GODEBUG
           value: fips140=on
-        image: sapse/sap-transp-proxy-operator:1.10.0
+        image: sapse/sap-transp-proxy-operator:1.10.1
         imagePullPolicy: Always
         livenessProbe:
           httpGet:
