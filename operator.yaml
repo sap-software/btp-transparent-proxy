@@ -613,8 +613,6 @@ spec:
                     type: object
                   image:
                     properties:
-                      initContainer:
-                        type: string
                       pullPolicy:
                         type: string
                       pullSecret:
@@ -1236,7 +1234,7 @@ spec:
         env:
         - name: GODEBUG
           value: fips140=on
-        image: sapse/sap-transp-proxy-operator:1.10.1
+        image: sapse/sap-transp-proxy-operator:1.10.2
         imagePullPolicy: Always
         livenessProbe:
           httpGet:
@@ -1267,26 +1265,12 @@ spec:
         - mountPath: /etc/logging
           name: sap-transp-proxy-operator-logging-config-volume
           readOnly: false
-      initContainers:
-      - command:
-        - sh
-        - -c
-        - touch /etc/logging/logger-config.yaml && cat /etc/conf/logger-config.yaml
-          > /etc/logging/logger-config.yaml && adduser --disabled-password tpproxy
-          && chown tpproxy /etc/logging/logger-config.yaml
-        image: docker.io/library/alpine:3.22.2
-        imagePullPolicy: IfNotPresent
-        name: config-init
-        securityContext:
-          readOnlyRootFilesystem: false
-        volumeMounts:
-        - mountPath: /etc/logging
-          name: sap-transp-proxy-operator-logging-config-volume
-          readOnly: false
-        - mountPath: /etc/conf
+        - mountPath: /etc/logging-config
           name: sap-transp-proxy-operator-logging-config
-          readOnly: false
+          readOnly: true
       priorityClassName: sap-transp-proxy-operator-priority-class
+      securityContext:
+        fsGroup: 1000
       serviceAccountName: sap-transp-proxy-operator
       terminationGracePeriodSeconds: 10
       volumes:
